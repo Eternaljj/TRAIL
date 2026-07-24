@@ -1,257 +1,92 @@
 # TRAIL
 
-TRAIL is a usefulness-aware, dual-rationale classifier for fake cyber threat
-intelligence detection. The training pipeline encodes a claim, a supporting
-rationale, an opposing rationale, and path-derived evidence; evaluates rationale
-usefulness; adaptively weights the two rationale experts; and performs binary
-classification.
+该仓库为论文《Grounded in Knowledge, Guided by Reason: Automated Fake Cyber
+Threat Intelligence Detection via Knowledge-Augmented LLM Rationales》的实验代码。
 
-The authoritative training entrypoint is `run.sh`.
-
-## Directory layout
+## 仓库内容
 
 ```text
 TRAIL/
-├── README.md
-├── requirements.txt
-├── run.sh
-├── main.py
-├── grid_search.py
+├── run.sh                    # 训练入口
+├── main.py                   # 参数配置与主程序
+├── grid_search.py            # 训练调度
 ├── models/
-│   ├── __init__.py
-│   ├── layers.py
-│   └── trail.py
+│   ├── trail.py              # TRAIL 模型与训练器
+│   └── layers.py             # 模型基础层
 ├── utils/
-│   ├── __init__.py
-│   ├── dataloader.py
-│   └── utils.py
-├── data/
-│   └── FCTI_HAL/          # processed JSON files go here
-└── model/
-    └── roberta-base/      # local RoBERTa files go here
+│   ├── dataloader.py         # 数据加载
+│   └── utils.py              # 训练与评估工具
+├── requirements.txt          # Python 依赖
+├── data/FCTI_HAL/            # 处理后的数据集
+└── model/roberta-base/       # 本地 RoBERTa-base 模型
 ```
 
-The package intentionally excludes API keys, `.env` files, generated logs,
-checkpoints, caches, raw datasets, and unrelated experiment implementations.
+仓库不包含原始数据、处理后的数据文件及预训练模型权重。
 
-## 1. System requirements
+## 运行方法
 
-- Linux
-- Python 3.10 recommended
-- NVIDIA GPU with a CUDA driver compatible with PyTorch 2.3.0
-- Sufficient GPU memory for RoBERTa-base training with batch size 16
+### 1. 安装环境
 
-Check the environment:
+推荐使用 Python 3.10：
 
 ```bash
-nvidia-smi
-python --version
-```
+git clone https://github.com/Eternaljj/TRAIL.git
+cd TRAIL
 
-## 2. Create the Python environment
-
-From the TRAIL directory:
-
-```bash
-cd ~/workspace/experiments/TRAIL
 python3.10 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-If the server manages CUDA-specific PyTorch wheels separately, install the
-CUDA-compatible PyTorch 2.3.0 build first, then install the remaining packages
-from `requirements.txt`.
+### 2. 准备模型
 
-Verify the installation:
-
-```bash
-python -c "import torch, transformers; print(torch.__version__); print(torch.cuda.is_available())"
-```
-
-## 3. Prepare RoBERTa-base
-
-Place a complete local Hugging Face RoBERTa-base model under:
-
-```text
-~/workspace/experiments/TRAIL/model/roberta-base/
-```
-
-The directory should contain the model configuration, tokenizer files, and
-weights, for example:
+将完整的 Hugging Face RoBERTa-base 模型放到：
 
 ```text
 model/roberta-base/
-├── config.json
-├── merges.txt
-├── tokenizer.json
-├── tokenizer_config.json
-├── vocab.json
-└── model.safetensors        # or pytorch_model.bin
 ```
 
-The location can be overridden without editing the script:
+也可以通过环境变量指定其他位置：
 
 ```bash
 export TRAIL_MODEL_PATH=/absolute/path/to/roberta-base
 ```
 
-## 4. Prepare the processed FCTI-HAL data
+### 3. 准备数据
 
-`data/FCTI_HAL/` is intentionally empty. The available FCTI-HAL CSV is a raw
-dataset and cannot be consumed directly by this training entrypoint.
-
-After preprocessing and rationale/path generation, place these three files in:
+将处理后的 FCTI-HAL 数据放到：
 
 ```text
-~/workspace/experiments/TRAIL/data/FCTI_HAL/
+data/FCTI_HAL/
 ├── train.json
 ├── val.json
 └── test.json
 ```
 
-Each file must be one UTF-8 JSON array. Each item requires:
+每条数据至少包含 `content`、`label`、`support_rationale` 和
+`oppose_rationale` 字段，建议同时包含 `id` 与 `selected_paths`。
 
-- `content`: CTI claim text
-- `label`: `real`/`fake` or the numeric equivalent accepted by the loader
-- `support_rationale`: supporting rationale text
-- `oppose_rationale`: opposing rationale text
-
-Recommended fields:
-
-- `id`: sample identifier
-- `selected_paths`: list of evidence paths
-
-When `selected_paths` is present, every path may contain:
-
-```json
-{
-  "path_type": "support",
-  "triples": [
-    {
-      "head": "entity A",
-      "relation": "relation",
-      "tail": "entity B"
-    }
-  ]
-}
-```
-
-`path_type` must be `support` or `oppose`. If usable selected paths are absent,
-the loader falls back to the corresponding rationale as evidence.
-
-To use another processed-data directory:
+也可以通过环境变量指定其他数据目录：
 
 ```bash
 export TRAIL_DATA_DIR=/absolute/path/to/processed/FCTI_HAL
 ```
 
-The entrypoint uses `python3` by default. To use the `python` command from an
-activated virtual or Conda environment:
+### 4. 开始训练
 
 ```bash
-export PYTHON_BIN=python
-```
-
-## 5. Run training
-
-Default run:
-
-```bash
-cd ~/workspace/experiments/TRAIL
-source .venv/bin/activate
 bash run.sh
 ```
 
-The default configuration is:
-
-| Setting | Value |
-|---|---:|
-| GPU | 3 |
-| Epochs | 30 |
-| Batch size | 16 |
-| Learning rate | 1e-4 |
-| Early stopping patience | 10 |
-| Maximum sequence length | 256 |
-| Weight decay | 1e-4 |
-| Usefulness margin | 0.05 |
-| Usefulness loss weight | 0.20 |
-| Pooling | attention |
-| Explicit conflict features | enabled |
-
-Example overrides:
+指定 GPU 或调整训练参数：
 
 ```bash
-bash run.sh \
-  --gpu 0 \
-  --batch_size 8 \
-  --epochs 30 \
-  --usefulness_margin 0.05 \
-  --lambda_use 0.20 \
-  --pooling_method attention
+bash run.sh --gpu 0 --batch_size 8 --epochs 30
 ```
 
-Show all options:
+查看全部参数：
 
 ```bash
 bash run.sh --help
-```
-
-## 6. Outputs
-
-Training creates:
-
-```text
-param_model/TRAIL_cti-hal-conflict/1/
-├── parameter_bert.pkl
-└── parameter_bert_acc.pkl
-
-logs/test/TRAIL_cti-hal-conflict/month_1.json
-```
-
-- `parameter_bert.pkl` is the checkpoint selected by validation macro F1.
-- `parameter_bert_acc.pkl` is the checkpoint selected by validation accuracy.
-- `month_1.json` records test metrics for both checkpoints.
-
-Additional parameter, TensorBoard, and intermediate JSON logs are written below
-`logs/`.
-
-## 7. Common issues
-
-### Processed dataset file is missing
-
-Confirm that all three processed files are present:
-
-```bash
-ls -lh data/FCTI_HAL/train.json data/FCTI_HAL/val.json data/FCTI_HAL/test.json
-```
-
-### RoBERTa cannot be loaded
-
-Confirm that `model/roberta-base/` is a complete Hugging Face model directory,
-not only a tokenizer or configuration directory.
-
-### CUDA is unavailable
-
-Check:
-
-```bash
-python -c "import torch; print(torch.cuda.is_available()); print(torch.version.cuda)"
-```
-
-Then verify the NVIDIA driver and installed PyTorch build.
-
-### Out of GPU memory
-
-Reduce the batch size:
-
-```bash
-bash run.sh --batch_size 8
-```
-
-### Disable explicit conflict features
-
-```bash
-bash run.sh --disable_conflict_features
 ```
