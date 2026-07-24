@@ -8,7 +8,7 @@ param_model/
 runs/
 
 data/FCTI_HAL/*
-!data/FCTI_HAL/.gitkeep
+!data/FCTI_HAL/FCTI-HAL.csv
 
 model/roberta-base/*
 !model/roberta-base/.gitkeep
