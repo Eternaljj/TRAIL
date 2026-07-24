@@ -18,12 +18,13 @@ TRAIL/
 │   ├── dataloader.py         # Data loading
 │   └── utils.py              # Training and evaluation utilities
 ├── requirements.txt          # Python dependencies
-├── data/FCTI_HAL/            # Processed dataset
+├── data/FCTI_HAL/
+│   └── FCTI-HAL.csv          # Raw FCTI-HAL dataset
 └── model/roberta-base/       # Local RoBERTa-base model
 ```
 
-The repository does not include the raw dataset, processed data files, or
-pretrained model weights.
+The repository includes the raw FCTI-HAL dataset. Processed data files and
+pretrained model weights are not included.
 
 ## How to Run
 
@@ -57,7 +58,13 @@ export TRAIL_MODEL_PATH=/absolute/path/to/roberta-base
 
 ### 3. Prepare the Data
 
-Place the processed FCTI-HAL dataset in:
+The raw dataset is provided at:
+
+```text
+data/FCTI_HAL/FCTI-HAL.csv
+```
+
+Before training, place the processed FCTI-HAL splits in the same directory:
 
 ```text
 data/FCTI_HAL/
